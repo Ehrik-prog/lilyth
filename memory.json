@@ -1,0 +1,24 @@
+{
+  "default": [
+    {
+      "type": "user",
+      "interaction": "Bonsoir lilyth"
+    },
+    {
+      "type": "user",
+      "interaction": "Comment vas tu?"
+    },
+    {
+      "type": "user",
+      "interaction": "Lilyth r\u00e9ponse ?"
+    },
+    {
+      "type": "user",
+      "interaction": "Bon visiblement tu as d\u00e9sormais de la m\u00e9moire mais maintenant tu ne le r\u00e9pond plus..."
+    }
+  ],
+  "6767314478": [
+    "Hello",
+    "\ud83d\udc4b"
+  ]
+}
