@@ -1,2 +1,4 @@
+
 #!/bin/bash
-python main.py
+# Script pour lancer Lilyth sur Railway
+python3 lilyth_bot.py
