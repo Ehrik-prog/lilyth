@@ -1,71 +1,43 @@
 import os
-import logging
+import asyncio
 from telegram import Update
-from telegram.ext import ApplicationBuilder, ContextTypes, CommandHandler, MessageHandler, filters
+from telegram.ext import Application, CommandHandler, ContextTypes
 import openai
 
-# ----------------------
-# CONFIG LOGGING
-# ----------------------
-logging.basicConfig(
-    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
-    level=logging.INFO
-)
-logger = logging.getLogger(__name__)
-
-# ----------------------
-# CONFIG TOKENS
-# ----------------------
-TELEGRAM_TOKEN = os.environ.get("TELEGRAM_TOKEN")
-OPENAI_API_KEY = os.environ.get("OPENAI_API_KEY")
-
-if not TELEGRAM_TOKEN:
-    raise ValueError("Le token Telegram n'est pas défini !")
-if not OPENAI_API_KEY:
-    raise ValueError("La clé OpenAI n'est pas définie !")
+# Assure-toi que tes variables Railway sont bien partagées et accessibles
+TELEGRAM_TOKEN = os.getenv("TELEGRAM_TOKEN")
+OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
 
 openai.api_key = OPENAI_API_KEY
 
-# ----------------------
-# HANDLERS
-# ----------------------
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    await update.message.reply_text("🤖 Lilyth est en ligne ! Envoyez-moi un message.")
+    await update.message.reply_text("🤖 Lilyth est connectée et prête !")
 
-async def chat(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    user_message = update.message.text
-    try:
-        response = openai.ChatCompletion.create(
-            model="gpt-3.5-turbo",
-            messages=[
-                {"role": "system", "content": "Tu es Lilyth, une assistante IA."},
-                {"role": "user", "content": user_message}
-            ],
-            temperature=0.7,
-            max_tokens=500
-        )
-        reply_text = response['choices'][0]['message']['content'].strip()
-    except Exception as e:
-        logger.error("Erreur OpenAI : %s", e)
-        reply_text = "😵‍💫 Oups, erreur côté OpenAI !"
+async def ask_ai(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    user_text = " ".join(context.args)
+    if not user_text:
+        await update.message.reply_text("Envoie-moi une question après la commande.")
+        return
 
-    await update.message.reply_text(reply_text)
+    # Appel à OpenAI
+    response = openai.ChatCompletion.create(
+        model="gpt-3.5-turbo",
+        messages=[{"role": "user", "content": user_text}],
+        temperature=0.7
+    )
+    answer = response.choices[0].message.content
+    await update.message.reply_text(answer)
 
-# ----------------------
-# MAIN BOT
-# ----------------------
-def main():
-    app = ApplicationBuilder().token(TELEGRAM_TOKEN).build()
+async def main():
+    app = Application.builder().token(TELEGRAM_TOKEN).build()
 
-    # Commandes
     app.add_handler(CommandHandler("start", start))
+    app.add_handler(CommandHandler("ask", ask_ai))
 
-    # Messages libres
-    app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, chat))
-
-    logger.info("🤖 Lilyth démarre sur Telegram...")
-    # run_polling avec close_loop=False pour éviter les erreurs de loop
-    app.run_polling(close_loop=False)
+    print("🤖 Lilyth démarre sur Telegram...")
+    await app.run_polling(close_loop=False)
 
 if __name__ == "__main__":
-    main()
+    import nest_asyncio
+    nest_asyncio.apply()  # pour colab / environnements déjà asynchrones
+    asyncio.run(main())
