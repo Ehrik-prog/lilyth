@@ -1,73 +1,114 @@
-import os
-import json
-from telegram import Update
-from telegram.ext import ApplicationBuilder, ContextTypes, CommandHandler, MessageHandler, filters
-from openai import OpenAI
-
-# --- Vérification des tokens ---
-TELEGRAM_TOKEN = os.getenv("TELEGRAM_TOKEN")
-if not TELEGRAM_TOKEN:
-    raise ValueError("⚠️ TELEGRAM_TOKEN manquant dans les variables d'environnement !")
-
-# Fichier mémoire
-MEMORY_FILE = "memory.json"
-
-# Chargement mémoire
-if os.path.exists(MEMORY_FILE):
-    with open(MEMORY_FILE, "r", encoding="utf-8") as f:
-        memory = json.load(f)
-else:
-    memory = {}
-
-def save_memory():
-    with open(MEMORY_FILE, "w", encoding="utf-8") as f:
-        json.dump(memory, f, ensure_ascii=False, indent=2)
-
-# --- Handlers Telegram ---
-async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    await update.message.reply_text("Salut ! Je suis Lilyth, ton assistant.")
-
-async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    user_id = str(update.effective_user.id)
-    message_text = update.message.text
-
-    # Sauvegarde du message
-    if user_id not in memory:
-        memory[user_id] = []
-    memory[user_id].append(message_text)
-    save_memory()
-
-    # --- Lecture clé OpenAI au moment du message ---
-    OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
-    if not OPENAI_API_KEY:
-        await update.message.reply_text("⚠️ OpenAI API key manquante !")
-        return
-
-    client = OpenAI(api_key=OPENAI_API_KEY)
-
-    try:
-        response = client.chat.completions.create(
-            model="gpt-4o-mini",
-            messages=[
-                {"role": "system", "content": "Tu es Lilyth, assistant Telegram de Eric."},
-                {"role": "user", "content": message_text}
-            ]
-        )
-        reply_text = response.choices[0].message.content
-    except Exception as e:
-        reply_text = f"⚠️ Erreur OpenAI : {e}"
-
-    await update.message.reply_text(reply_text)
-
-# --- Création de l'application ---
-app = ApplicationBuilder().token(TELEGRAM_TOKEN).build()
-
-# Handlers
-app.add_handler(CommandHandler("start", start))
-app.add_handler(MessageHandler(filters.TEXT & (~filters.COMMAND), handle_message))
-
-# --- Lancement ---
-if __name__ == "__main__":
-    print("💾 Mémoire chargée")
-    print("🤖 Lilyth est connectée à Telegram et prête !")
+        updater_coroutine=self.updater.start_polling(
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    ...<12 lines>...
+        stop_signals=stop_signals,
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^
+    )
+    ^
+  File "/app/.venv/lib/python3.14/site-packages/telegram/ext/_application.py", line 1061, in __run
+    loop = asyncio.get_event_loop()
+  File "/mise/installs/python/3.14.3/lib/python3.14/asyncio/events.py", line 715, in get_event_loop
+    raise RuntimeError('There is no current event loop in thread %r.'
+                       % threading.current_thread().name)
+RuntimeError: There is no current event loop in thread 'MainThread'.
+<sys>:0: RuntimeWarning: coroutine 'Updater.start_polling' was never awaited
+/app/.venv/lib/python3.14/site-packages/openai/_compat.py:46: UserWarning: Core Pydantic V1 functionality isn't compatible with Python 3.14 or greater.
+  from pydantic.v1.typing import get_args as get_args
+💾 Mémoire chargée
+🤖 Lilyth est connectée à Telegram et prête !
+Traceback (most recent call last):
+  File "/app/main.py", line 73, in <module>
     app.run_polling(close_loop=False)
+    ~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^
+  File "/app/.venv/lib/python3.14/site-packages/telegram/ext/_application.py", line 881, in run_polling
+    return self.__run(
+           ~~~~~~~~~~^
+        updater_coroutine=self.updater.start_polling(
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    ...<12 lines>...
+        stop_signals=stop_signals,
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^
+    )
+    ^
+  File "/app/.venv/lib/python3.14/site-packages/telegram/ext/_application.py", line 1061, in __run
+    loop = asyncio.get_event_loop()
+  File "/mise/installs/python/3.14.3/lib/python3.14/asyncio/events.py", line 715, in get_event_loop
+    raise RuntimeError('There is no current event loop in thread %r.'
+                       % threading.current_thread().name)
+RuntimeError: There is no current event loop in thread 'MainThread'.
+<sys>:0: RuntimeWarning: coroutine 'Updater.start_polling' was never awaited
+/app/.venv/lib/python3.14/site-packages/openai/_compat.py:46: UserWarning: Core Pydantic V1 functionality isn't compatible with Python 3.14 or greater.
+  from pydantic.v1.typing import get_args as get_args
+<sys>:0: RuntimeWarning: coroutine 'Updater.start_polling' was never awaited
+    ...<12 lines>...
+        updater_coroutine=self.updater.start_polling(
+        stop_signals=stop_signals,
+💾 Mémoire chargée
+🤖 Lilyth est connectée à Telegram et prête !
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Traceback (most recent call last):
+    )
+    ^
+  File "/app/.venv/lib/python3.14/site-packages/telegram/ext/_application.py", line 1061, in __run
+  File "/app/main.py", line 73, in <module>
+    loop = asyncio.get_event_loop()
+    app.run_polling(close_loop=False)
+  File "/mise/installs/python/3.14.3/lib/python3.14/asyncio/events.py", line 715, in get_event_loop
+    ~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^
+    raise RuntimeError('There is no current event loop in thread %r.'
+  File "/app/.venv/lib/python3.14/site-packages/telegram/ext/_application.py", line 881, in run_polling
+    return self.__run(
+           ~~~~~~~~~~^
+                       % threading.current_thread().name)
+RuntimeError: There is no current event loop in thread 'MainThread'.
+/app/.venv/lib/python3.14/site-packages/openai/_compat.py:46: UserWarning: Core Pydantic V1 functionality isn't compatible with Python 3.14 or greater.
+  from pydantic.v1.typing import get_args as get_args
+  File "/app/.venv/lib/python3.14/site-packages/telegram/ext/_application.py", line 1061, in __run
+💾 Mémoire chargée
+    ...<12 lines>...
+    loop = asyncio.get_event_loop()
+🤖 Lilyth est connectée à Telegram et prête !
+        stop_signals=stop_signals,
+  File "/app/.venv/lib/python3.14/site-packages/telegram/ext/_application.py", line 881, in run_polling
+Traceback (most recent call last):
+  File "/mise/installs/python/3.14.3/lib/python3.14/asyncio/events.py", line 715, in get_event_loop
+    return self.__run(
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^
+           ~~~~~~~~~~^
+  File "/app/main.py", line 73, in <module>
+    )
+    raise RuntimeError('There is no current event loop in thread %r.'
+    app.run_polling(close_loop=False)
+        updater_coroutine=self.updater.start_polling(
+    ^
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    ~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^
+RuntimeError: There is no current event loop in thread 'MainThread'.
+<sys>:0: RuntimeWarning: coroutine 'Updater.start_polling' was never awaited
+                       % threading.current_thread().name)
+    raise RuntimeError('There is no current event loop in thread %r.'
+    return self.__run(
+           ~~~~~~~~~~^
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    ...<12 lines>...
+        updater_coroutine=self.updater.start_polling(
+        stop_signals=stop_signals,
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^
+    )
+    ^
+  File "/app/.venv/lib/python3.14/site-packages/telegram/ext/_application.py", line 1061, in __run
+    loop = asyncio.get_event_loop()
+  File "/mise/installs/python/3.14.3/lib/python3.14/asyncio/events.py", line 715, in get_event_loop
+/app/.venv/lib/python3.14/site-packages/openai/_compat.py:46: UserWarning: Core Pydantic V1 functionality isn't compatible with Python 3.14 or greater.
+  from pydantic.v1.typing import get_args as get_args
+💾 Mémoire chargée
+🤖 Lilyth est connectée à Telegram et prête !
+Traceback (most recent call last):
+  File "/app/main.py", line 73, in <module>
+    app.run_polling(close_loop=False)
+    ~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^
+  File "/app/.venv/lib/python3.14/site-packages/telegram/ext/_application.py", line 881, in run_polling
+                       % threading.current_thread().name)
+RuntimeError: There is no current event loop in thread 'MainThread'.
+<sys>:0: RuntimeWarning: coroutine 'Updater.start_polling' was never awaited
