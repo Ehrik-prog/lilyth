@@ -1,80 +1,73 @@
 import os
-import json
-import asyncio
+import nest_asyncio
+import logging
 from telegram import Update
-from telegram.ext import ApplicationBuilder, CommandHandler, MessageHandler, filters, ContextTypes
-from openai import OpenAI, OpenAIError
+from telegram.ext import (
+    ApplicationBuilder,
+    CommandHandler,
+    ContextTypes,
+    MessageHandler,
+    filters
+)
+from openai import OpenAI
 
-# --- Variables d'environnement ---
+# ─── LOGGING ──────────────────────────────────────────────
+logging.basicConfig(
+    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
+    level=logging.INFO
+)
+logger = logging.getLogger(__name__)
+
+# ─── VARIABLES D'ENVIRONNEMENT ───────────────────────────
 TELEGRAM_TOKEN = os.getenv("TELEGRAM_TOKEN")
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
-MEMORY_FILE = "memory.json"
 
 if not TELEGRAM_TOKEN:
     raise ValueError("⚠️ TELEGRAM_TOKEN manquant dans les variables d'environnement !")
 if not OPENAI_API_KEY:
     raise ValueError("⚠️ OPENAI_API_KEY manquant dans les variables d'environnement !")
 
-# --- Initialisation OpenAI ---
-try:
-    client = OpenAI(api_key=OPENAI_API_KEY)
-except OpenAIError as e:
-    print("Erreur OpenAI:", e)
-    raise e
+# ─── CLIENT OPENAI ───────────────────────────────────────
+client = OpenAI(api_key=OPENAI_API_KEY)
 
-# --- Gestion de la mémoire ---
-if os.path.exists(MEMORY_FILE):
-    with open(MEMORY_FILE, "r", encoding="utf-8") as f:
-        memory = json.load(f)
-else:
-    memory = {}
+# ─── PATCH ASYNCIO (pour pb loop sur certains environnements) ───
+nest_asyncio.apply()
 
-def save_memory():
-    with open(MEMORY_FILE, "w", encoding="utf-8") as f:
-        json.dump(memory, f, ensure_ascii=False, indent=2)
-
-# --- Handlers Telegram ---
+# ─── HANDLERS TELEGRAM ───────────────────────────────────
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    await update.message.reply_text("Bonjour ! Lilyth est connectée 🤖")
+    await update.message.reply_text("Salut ! Lilyth est prête à discuter 🤖")
 
-async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    user_id = str(update.message.from_user.id)
-    text = update.message.text
-    # Enregistre le message dans la mémoire
-    if user_id not in memory:
-        memory[user_id] = []
-    memory[user_id].append(text)
-    save_memory()
+async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    await update.message.reply_text(
+        "Commandes disponibles:\n"
+        "/start - Démarre le bot\n"
+        "/help - Affiche ce message\n"
+        "Tu peux aussi envoyer un message et Lilyth te répondra via OpenAI !"
+    )
 
-    # Appel OpenAI
+async def echo(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Répond à tout message texte via OpenAI GPT."""
+    user_message = update.message.text
     try:
         response = client.chat.completions.create(
             model="gpt-4o-mini",
-            messages=[
-                {"role": "system", "content": "Tu es Lilyth, une assistante IA."},
-                {"role": "user", "content": text},
-            ]
+            messages=[{"role": "user", "content": user_message}],
+            max_tokens=300
         )
-        answer = response.choices[0].message.content
+        reply = response.choices[0].message.content
     except Exception as e:
-        answer = "⚠️ Erreur OpenAI : " + str(e)
+        logger.error(f"Erreur OpenAI: {e}")
+        reply = "Désolé, je n'ai pas pu générer de réponse."
+    await update.message.reply_text(reply)
 
-    await update.message.reply_text(answer)
-
-# --- Création de l'application Telegram ---
+# ─── APPLICATION TELEGRAM ───────────────────────────────
 app = ApplicationBuilder().token(TELEGRAM_TOKEN).build()
 app.add_handler(CommandHandler("start", start))
-app.add_handler(MessageHandler(filters.TEXT & (~filters.COMMAND), handle_message))
+app.add_handler(CommandHandler("help", help_command))
+app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, echo))
 
-# --- Correction event loop pour Python 3.14+ ---
-try:
-    loop = asyncio.get_event_loop()
-except RuntimeError:
-    loop = asyncio.new_event_loop()
-    asyncio.set_event_loop(loop)
-
-print("💾 Mémoire chargée")
-print("🤖 Lilyth est connectée à Telegram et prête !")
-
-# --- Démarrage du bot ---
-app.run_polling(close_loop=False)
+# ─── MAIN ───────────────────────────────────────────────
+if __name__ == "__main__":
+    logger.info("💾 Mémoire chargée")
+    logger.info("🤖 Lilyth est connectée à Telegram et prête !")
+    app.run_polling(close_loop=False)
