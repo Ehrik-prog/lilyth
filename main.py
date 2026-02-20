@@ -1,68 +1,50 @@
-# main.py
 import os
 import logging
-import asyncio
-from telegram import Update
-from telegram.ext import ApplicationBuilder, CommandHandler, ContextTypes, MessageHandler, filters
-from openai import OpenAI
+import nest_asyncio
+from telegram.ext import ApplicationBuilder, CommandHandler, MessageHandler, filters
 
-# ───── CONFIG LOG ─────
+# ✅ Appliquer nest_asyncio pour réutiliser l'event loop existant
+nest_asyncio.apply()
+
+# 🔹 Configuration du logging
 logging.basicConfig(
-    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
     level=logging.INFO
 )
 logger = logging.getLogger(__name__)
 
-# ───── VARIABLES D'ENVIRONNEMENT ─────
+# 🔹 Récupérer le token depuis les variables d'environnement
 TELEGRAM_TOKEN = os.getenv("TELEGRAM_TOKEN")
-OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
-
 if not TELEGRAM_TOKEN:
-    raise ValueError("⚠️ TELEGRAM_TOKEN manquant dans les variables d'environnement !")
-if not OPENAI_API_KEY:
-    raise ValueError("⚠️ OPENAI_API_KEY manquant dans les variables d'environnement !")
+    raise RuntimeError("⚠️ TELEGRAM_TOKEN non trouvé dans les variables d'environnement")
 
-# ───── CLIENT OPENAI ─────
-client = OpenAI(api_key=OPENAI_API_KEY)
+# 🔹 Exemple de commandes
+async def start(update, context):
+    await update.message.reply_text("Salut ! Lilyth est prête 🤖")
 
-# ───── COMMANDES DE BASE ─────
-async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    await update.message.reply_text("💾 Lilyth est connectée et prête !")
+async def echo(update, context):
+    await update.message.reply_text(update.message.text)
 
-async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    await update.message.reply_text("Envoyez un message et Lilyth vous répondra via OpenAI.")
-
-# ───── GESTION DES MESSAGES ─────
-async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    user_message = update.message.text
-
-    # Génération de réponse via OpenAI
-    try:
-        response = client.chat.completions.create(
-            model="gpt-4o-mini",
-            messages=[{"role": "user", "content": user_message}]
-        )
-        reply_text = response.choices[0].message.content
-    except Exception as e:
-        logger.error(f"Erreur OpenAI: {e}")
-        reply_text = "❌ Une erreur est survenue lors de la génération de la réponse."
-
-    await update.message.reply_text(reply_text)
-
-# ───── APPLICATION TELEGRAM ─────
+# 🔹 Fonction principale
 async def main():
     app = ApplicationBuilder().token(TELEGRAM_TOKEN).build()
 
-    # Commandes
+    # Ajouter handlers
     app.add_handler(CommandHandler("start", start))
-    app.add_handler(CommandHandler("help", help_command))
-
-    # Messages
-    app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
+    app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, echo))
 
     logger.info("🤖 Lilyth démarre sur Telegram...")
-    await app.run_polling()
+    # run_polling avec close_loop=False pour ne pas fermer l'event loop existant
+    await app.run_polling(close_loop=False)
 
-if __name__ == "__main__":
-    # asyncio.run pour gérer l'event loop correctement
+# 🔹 Lancer main
+import asyncio
+
+try:
+    # Si l'event loop est déjà actif (Railway / Colab), on utilise get_event_loop()
+    loop = asyncio.get_event_loop()
+    loop.run_until_complete(main())
+except RuntimeError as e:
+    # fallback si aucun loop existant
+    logger.warning(f"Event loop déjà en cours : {e}")
     asyncio.run(main())
