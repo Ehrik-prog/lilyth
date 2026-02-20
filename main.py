@@ -1,99 +1,94 @@
-# main.py
 import os
 import json
 import asyncio
-from telegram import Update
-from telegram.ext import Application, CommandHandler, MessageHandler, filters, ContextTypes
+from telegram import Update, ForceReply
+from telegram.ext import ApplicationBuilder, CommandHandler, ContextTypes, MessageHandler, filters
 from openai import OpenAI, OpenAIError
 
-# ─── Variables d'environnement ───
+# -----------------------------
+# Vérification des variables d'environnement
+# -----------------------------
 TELEGRAM_TOKEN = os.getenv("TELEGRAM_TOKEN")
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
 
 if not TELEGRAM_TOKEN:
     raise ValueError("⚠️ TELEGRAM_TOKEN manquant dans les variables d'environnement !")
-
 if not OPENAI_API_KEY:
     raise ValueError("⚠️ OPENAI_API_KEY manquant dans les variables d'environnement !")
 
-# ─── Initialisation OpenAI ───
-client = OpenAI(api_key=OPENAI_API_KEY)
+# -----------------------------
+# Initialisation OpenAI
+# -----------------------------
+try:
+    client = OpenAI(api_key=OPENAI_API_KEY)
+except OpenAIError as e:
+    raise RuntimeError(f"Erreur OpenAI : {e}")
 
-# ─── Mémoire locale ───
+# -----------------------------
+# Mémoire persistante
+# -----------------------------
 MEMORY_FILE = "memory.json"
+if os.path.exists(MEMORY_FILE):
+    with open(MEMORY_FILE, "r", encoding="utf-8") as f:
+        memory = json.load(f)
+else:
+    memory = {}
 
-def load_memory():
-    if os.path.exists(MEMORY_FILE):
-        with open(MEMORY_FILE, "r", encoding="utf-8") as f:
-            return json.load(f)
-    return {}
-
-def save_memory(memory):
+def save_memory():
     with open(MEMORY_FILE, "w", encoding="utf-8") as f:
         json.dump(memory, f, ensure_ascii=False, indent=2)
 
-memory = load_memory()
-
-# ─── Handlers ───
+# -----------------------------
+# Commandes Telegram
+# -----------------------------
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    await update.message.reply_text("🤖 Lilyth est en ligne et prête !")
+    user = update.effective_user
+    await update.message.reply_html(
+        rf"Salut {user.mention_html()} ! Je suis Lilyth, ton assistant IA.",
+        reply_markup=ForceReply(selective=True),
+    )
 
-async def echo(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    user_id = str(update.message.from_user.id)
-    text = update.message.text
+async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    user_id = str(update.effective_user.id)
+    message_text = update.message.text
 
-    # sauvegarde du message dans la mémoire
+    # Sauvegarde du message dans la mémoire
     if user_id not in memory:
         memory[user_id] = []
-    memory[user_id].append(text)
-    save_memory(memory)
+    memory[user_id].append(message_text)
+    save_memory()
 
-    await update.message.reply_text(f"Message enregistré : {text}")
-
-async def ask_openai(prompt: str):
+    # Appel OpenAI pour réponse
     try:
         response = client.chat.completions.create(
             model="gpt-4o-mini",
-            messages=[{"role": "user", "content": prompt}],
+            messages=[
+                {"role": "system", "content": "Tu es Lilyth, assistant Telegram de Eric."},
+                {"role": "user", "content": message_text}
+            ]
         )
-        return response.choices[0].message.content
-    except OpenAIError as e:
-        return f"Erreur OpenAI : {str(e)}"
+        reply_text = response.choices[0].message.content
+    except Exception as e:
+        reply_text = f"⚠️ Erreur OpenAI : {e}"
 
-async def chat(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    user_id = str(update.message.from_user.id)
-    text = update.message.text
+    await update.message.reply_text(reply_text)
 
-    reply = await ask_openai(text)
-
-    if user_id not in memory:
-        memory[user_id] = []
-    memory[user_id].append(f"Bot: {reply}")
-    save_memory(memory)
-
-    await update.message.reply_text(reply)
-
-# ─── Main ───
+# -----------------------------
+# Application Telegram
+# -----------------------------
 async def main():
-    app = Application.builder().token(TELEGRAM_TOKEN).build()
+    app = ApplicationBuilder().token(TELEGRAM_TOKEN).build()
 
-    # Commandes
     app.add_handler(CommandHandler("start", start))
-    
-    # Messages simples → echo + sauvegarde
-    app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, echo))
+    app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
 
-    # Messages avec AI → pour activer l’OpenAI chat, remplacer echo par chat si voulu
-    # app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, chat))
+    print("💾 Mémoire chargée")
+    print("🤖 Lilyth est connectée à Telegram et prête !")
 
-    print("💾 Lilyth v1 prête et en ligne...")
     await app.run_polling()
 
-# ─── Lancement ───
+# -----------------------------
+# Lancement
+# -----------------------------
 if __name__ == "__main__":
-    try:
-        asyncio.run(main())
-    except RuntimeError:
-        # si loop déjà en cours
-        loop = asyncio.get_event_loop()
-        loop.run_until_complete(main())
+    asyncio.run(main())
