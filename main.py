@@ -1,102 +1,68 @@
+# main.py
 import os
-import json
 import logging
-import nest_asyncio
+import asyncio
 from telegram import Update
-from telegram.ext import (
-    ApplicationBuilder,
-    CommandHandler,
-    MessageHandler,
-    ContextTypes,
-    filters
-)
+from telegram.ext import ApplicationBuilder, CommandHandler, ContextTypes, MessageHandler, filters
 from openai import OpenAI
 
-# ─── LOGGING ───────────────────────────────
+# ───── CONFIG LOG ─────
 logging.basicConfig(
     format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
     level=logging.INFO
 )
 logger = logging.getLogger(__name__)
 
-# ─── PATCH ASYNCIO POUR ENVIRONNEMENTS SPAWN THREAD ─────
-nest_asyncio.apply()
-
-# ─── VARIABLES D'ENVIRONNEMENT ─────────────
+# ───── VARIABLES D'ENVIRONNEMENT ─────
 TELEGRAM_TOKEN = os.getenv("TELEGRAM_TOKEN")
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
-MEMORY_FILE = "memory.json"
 
 if not TELEGRAM_TOKEN:
     raise ValueError("⚠️ TELEGRAM_TOKEN manquant dans les variables d'environnement !")
 if not OPENAI_API_KEY:
     raise ValueError("⚠️ OPENAI_API_KEY manquant dans les variables d'environnement !")
 
-# ─── CLIENT OPENAI ─────────────────────────
+# ───── CLIENT OPENAI ─────
 client = OpenAI(api_key=OPENAI_API_KEY)
 
-# ─── CHARGEMENT DE LA MÉMOIRE ─────────────
-if os.path.exists(MEMORY_FILE):
-    with open(MEMORY_FILE, "r", encoding="utf-8") as f:
-        memory = json.load(f)
-else:
-    memory = {}
-
-# ─── FONCTIONS ───────────────────────────
-async def save_memory():
-    with open(MEMORY_FILE, "w", encoding="utf-8") as f:
-        json.dump(memory, f, ensure_ascii=False, indent=2)
-
+# ───── COMMANDES DE BASE ─────
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    await update.message.reply_text("Salut ! Je suis Lilyth 🤖. Prête à discuter.")
+    await update.message.reply_text("💾 Lilyth est connectée et prête !")
 
 async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    await update.message.reply_text(
-        "/start - Démarrer le bot\n"
-        "/help - Afficher ce message\n"
-        "/reset - Réinitialiser la mémoire de conversation\n"
-        "Tu peux aussi m'envoyer un message et je te répondrai !"
-    )
+    await update.message.reply_text("Envoyez un message et Lilyth vous répondra via OpenAI.")
 
-async def reset(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    user_id = str(update.message.from_user.id)
-    if user_id in memory:
-        memory[user_id] = []
-        await save_memory()
-    await update.message.reply_text("Mémoire réinitialisée ✅")
-
+# ───── GESTION DES MESSAGES ─────
 async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    user_id = str(update.message.from_user.id)
     user_message = update.message.text
 
-    # Ajouter à la mémoire
-    if user_id not in memory:
-        memory[user_id] = []
-    memory[user_id].append({"role": "user", "content": user_message})
-
+    # Génération de réponse via OpenAI
     try:
         response = client.chat.completions.create(
             model="gpt-4o-mini",
-            messages=memory[user_id],
-            max_tokens=300
+            messages=[{"role": "user", "content": user_message}]
         )
-        reply = response.choices[0].message.content
-        memory[user_id].append({"role": "assistant", "content": reply})
-        await save_memory()
+        reply_text = response.choices[0].message.content
     except Exception as e:
         logger.error(f"Erreur OpenAI: {e}")
-        reply = "Désolé, je n'ai pas pu générer de réponse."
-    await update.message.reply_text(reply)
+        reply_text = "❌ Une erreur est survenue lors de la génération de la réponse."
 
-# ─── APPLICATION TELEGRAM ───────────────
-app = ApplicationBuilder().token(TELEGRAM_TOKEN).build()
-app.add_handler(CommandHandler("start", start))
-app.add_handler(CommandHandler("help", help_command))
-app.add_handler(CommandHandler("reset", reset))
-app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
+    await update.message.reply_text(reply_text)
 
-# ─── LANCEMENT ─────────────────────────
+# ───── APPLICATION TELEGRAM ─────
+async def main():
+    app = ApplicationBuilder().token(TELEGRAM_TOKEN).build()
+
+    # Commandes
+    app.add_handler(CommandHandler("start", start))
+    app.add_handler(CommandHandler("help", help_command))
+
+    # Messages
+    app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
+
+    logger.info("🤖 Lilyth démarre sur Telegram...")
+    await app.run_polling()
+
 if __name__ == "__main__":
-    logger.info("💾 Mémoire chargée")
-    logger.info("🤖 Lilyth est connectée à Telegram et prête !")
-    app.run_polling(close_loop=False)
+    # asyncio.run pour gérer l'event loop correctement
+    asyncio.run(main())
