@@ -20,7 +20,10 @@ OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
 GITHUB_TOKEN = os.getenv("GITHUB_TOKEN")
 GITHUB_REPO = "<ton_nom_utilisateur>/lilyth-bot"  # ⚠️ remplace par ton user
 
-client = OpenAI(api_key=OPENAI_API_KEY)
+import os
+from openai import OpenAI
+
+client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 
 MEMORY_FILE = "memory.json"
 
