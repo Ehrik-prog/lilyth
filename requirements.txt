@@ -1,5 +1,5 @@
 python-telegram-bot==20.5
 openai==1.29.0
-nest-asyncio
+nest_asyncio==1.5.7
 python-dotenv
 requests
