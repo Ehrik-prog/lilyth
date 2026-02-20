@@ -1,35 +1,26 @@
+# main.py
 import os
 import json
 import asyncio
-import base64
-import requests
-from datetime import datetime
 from telegram import Update
-from telegram.ext import Application, MessageHandler, filters, ContextTypes
-from dotenv import load_dotenv
-from openai import OpenAI
+from telegram.ext import Application, CommandHandler, MessageHandler, filters, ContextTypes
+from openai import OpenAI, OpenAIError
 
-# ==============================
-# CONFIGURATION
-# ==============================
-
-load_dotenv()
-
+# ─── Variables d'environnement ───
 TELEGRAM_TOKEN = os.getenv("TELEGRAM_TOKEN")
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
-GITHUB_TOKEN = os.getenv("GITHUB_TOKEN")
-GITHUB_REPO = "<ton_nom_utilisateur>/lilyth-bot"  # ⚠️ remplace par ton user
 
-import os
-from openai import OpenAI
+if not TELEGRAM_TOKEN:
+    raise ValueError("⚠️ TELEGRAM_TOKEN manquant dans les variables d'environnement !")
 
-client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
+if not OPENAI_API_KEY:
+    raise ValueError("⚠️ OPENAI_API_KEY manquant dans les variables d'environnement !")
 
+# ─── Initialisation OpenAI ───
+client = OpenAI(api_key=OPENAI_API_KEY)
+
+# ─── Mémoire locale ───
 MEMORY_FILE = "memory.json"
-
-# ==============================
-# GESTION MÉMOIRE
-# ==============================
 
 def load_memory():
     if os.path.exists(MEMORY_FILE):
@@ -39,104 +30,70 @@ def load_memory():
 
 def save_memory(memory):
     with open(MEMORY_FILE, "w", encoding="utf-8") as f:
-        json.dump(memory, f, indent=4, ensure_ascii=False)
+        json.dump(memory, f, ensure_ascii=False, indent=2)
 
 memory = load_memory()
 
-# ==============================
-# BACKUP VIA API GITHUB
-# ==============================
+# ─── Handlers ───
+async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    await update.message.reply_text("🤖 Lilyth est en ligne et prête !")
 
-def backup_memory():
-    try:
-        if not GITHUB_TOKEN:
-            return
-
-        with open(MEMORY_FILE, "r", encoding="utf-8") as f:
-            content = f.read()
-
-        b64_content = base64.b64encode(content.encode()).decode()
-        now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-
-        headers = {
-            "Authorization": f"token {GITHUB_TOKEN}"
-        }
-
-        # Vérifier si le fichier existe
-        url_get = f"https://api.github.com/repos/{GITHUB_REPO}/contents/{MEMORY_FILE}"
-        r = requests.get(url_get, headers=headers)
-        sha = r.json().get("sha") if r.status_code == 200 else None
-
-        payload = {
-            "message": f"Backup memory {now}",
-            "content": b64_content,
-            "branch": "main"
-        }
-
-        if sha:
-            payload["sha"] = sha
-
-        url_put = f"https://api.github.com/repos/{GITHUB_REPO}/contents/{MEMORY_FILE}"
-        requests.put(url_put, headers=headers, json=payload)
-
-        print("Backup GitHub OK")
-
-    except Exception as e:
-        print("Erreur backup:", e)
-
-
-async def periodic_backup():
-    while True:
-        backup_memory()
-        await asyncio.sleep(300)  # toutes les 5 minutes
-
-
-# ==============================
-# INTELLIGENCE LILYTH
-# ==============================
-
-async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
+async def echo(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = str(update.message.from_user.id)
-    user_message = update.message.text
+    text = update.message.text
 
+    # sauvegarde du message dans la mémoire
     if user_id not in memory:
         memory[user_id] = []
+    memory[user_id].append(text)
+    save_memory(memory)
 
-    memory[user_id].append({"role": "user", "content": user_message})
+    await update.message.reply_text(f"Message enregistré : {text}")
 
+async def ask_openai(prompt: str):
     try:
         response = client.chat.completions.create(
             model="gpt-4o-mini",
-            messages=memory[user_id]
+            messages=[{"role": "user", "content": prompt}],
         )
+        return response.choices[0].message.content
+    except OpenAIError as e:
+        return f"Erreur OpenAI : {str(e)}"
 
-        reply = response.choices[0].message.content
+async def chat(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    user_id = str(update.message.from_user.id)
+    text = update.message.text
 
-        memory[user_id].append({"role": "assistant", "content": reply})
-        save_memory(memory)
+    reply = await ask_openai(text)
 
-        await update.message.reply_text(reply)
+    if user_id not in memory:
+        memory[user_id] = []
+    memory[user_id].append(f"Bot: {reply}")
+    save_memory(memory)
 
-    except Exception as e:
-        await update.message.reply_text("Erreur IA.")
-        print("Erreur OpenAI:", e)
+    await update.message.reply_text(reply)
 
-
-# ==============================
-# MAIN
-# ==============================
-
+# ─── Main ───
 async def main():
     app = Application.builder().token(TELEGRAM_TOKEN).build()
 
-    app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
+    # Commandes
+    app.add_handler(CommandHandler("start", start))
+    
+    # Messages simples → echo + sauvegarde
+    app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, echo))
 
-    print("🤖 Lilyth est en ligne...")
+    # Messages avec AI → pour activer l’OpenAI chat, remplacer echo par chat si voulu
+    # app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, chat))
 
-    asyncio.create_task(periodic_backup())
-
+    print("💾 Lilyth v1 prête et en ligne...")
     await app.run_polling()
 
-
+# ─── Lancement ───
 if __name__ == "__main__":
-    asyncio.run(main())
+    try:
+        asyncio.run(main())
+    except RuntimeError:
+        # si loop déjà en cours
+        loop = asyncio.get_event_loop()
+        loop.run_until_complete(main())
