@@ -1,7 +1,7 @@
 python-telegram-bot==20.7
 openai==2.21.0
 nest_asyncio==1.5.7
-httpx==0.24.1
-httpcore==0.17.2
+httpx~=0.25.2
+httpcore~=0.16.3
 python-dotenv
 requests
