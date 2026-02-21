@@ -4,11 +4,9 @@ import requests
 from telegram import Update
 from telegram.ext import Application, MessageHandler, filters, ContextTypes
 
-# ---- TOKENS ----
 TELEGRAM_TOKEN = os.getenv("TELEGRAM_TOKEN")
 HF_API_KEY = os.getenv("HUGGING_FACE_API_KEY")
 
-# ---- MEMOIRE ----
 MEMORY_FILE = "memory.json"
 
 def load_memory():
@@ -23,19 +21,25 @@ def save_memory(memory):
 
 memory = load_memory()
 
-# ---- HUGGINGFACE CHAT API ----
-HF_MODEL = "meta-llama/Llama-3.1-70B-Instruct"  # exemple de modèle puissant
+HF_MODEL = "meta-llama/Llama-3.1-8B-Instruct"
 
-def query_hf_api(messages):
-    url = f"https://api-inference.huggingface.co/models/{HF_MODEL}"
-    headers = {"Authorization": f"Bearer {HF_API_KEY}"}
-    data = {"inputs": messages, "options": {"wait_for_model": True}}
-    response = requests.post(url, headers=headers, json=data)
+def query_hf_api(prompt):
+    url = "https://api-inference.huggingface.co/models/" + HF_MODEL
+    headers = {
+        "Authorization": "Bearer " + HF_API_KEY
+    }
+    payload = {
+        "inputs": prompt,
+        "options": {"wait_for_model": True}
+    }
+    response = requests.post(url, headers=headers, json=payload)
     result = response.json()
-    text = result[0]["generated_text"] if isinstance(result, list) else str(result)
-    return text
 
-# ---- HANDLER ----
+    if isinstance(result, list):
+        return result[0]["generated_text"]
+    else:
+        return str(result)
+
 async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     try:
         user_id = str(update.message.from_user.id)
@@ -44,13 +48,10 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         history = memory.get(user_id, [])
         history.append({"role": "user", "content": user_input})
 
-        # Construire un prompt simple
         full_prompt = ""
         for msg in history[-10:]:
-            role = msg["role"]
-            content = msg["content"]
-            full_prompt += f"{role}: {content}\n​"
-​
+            full_prompt += msg["role"] + ": " + msg["content"] + "\n"
+
         answer = query_hf_api(full_prompt)
 
         history.append({"role": "assistant", "content": answer})
@@ -63,7 +64,6 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         print("Erreur:", e)
         await update.message.reply_text("⚠️ Une erreur est survenue.")
 
-# ---- MAIN ----
 if __name__ == "__main__":
     app = Application.builder().token(TELEGRAM_TOKEN).build()
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
