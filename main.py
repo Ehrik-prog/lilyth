@@ -24,7 +24,7 @@ memory = load_memory()
 HF_MODEL = "google/gemma-2b-it"
 
 def query_hf_api(prompt):
-    url = f"https://api-inference.huggingface.co/models/{HF_MODEL}"
+    url = f"https://router.huggingface.co/hf-inference/models/{HF_MODEL}"
     headers = {
         "Authorization": f"Bearer {HF_API_KEY}"
     }
