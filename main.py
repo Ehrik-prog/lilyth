@@ -49,7 +49,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         for msg in history[-10:]:
             role = msg["role"]
             content = msg["content"]
-            full_prompt += f"{role}: {content}\n​
+            full_prompt += f"{role}: {content}\n​"
 ​
 "
 
