@@ -21,8 +21,7 @@ def save_memory(memory):
 
 memory = load_memory()
 
-HF_MODEL = "mistralai/Mistral-7B-Instruct-v0.2"
-
+HF_MODEL = "OpenAssistant/release-10-13b"
 
 def query_hf_api(prompt):
     url = f"https://router.huggingface.co/hf-inference/models/{HF_MODEL}"
