@@ -60,7 +60,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         for msg in history[-10:]:
             full_prompt += msg["role"] + ": " + msg["content"] + "\n"
 
-        answer = query_hf_api(full_prompt)
+        answer = query_model(full_prompt)
 
         history.append({"role": "assistant", "content": answer})
         memory[user_id] = history
