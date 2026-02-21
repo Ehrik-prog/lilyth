@@ -23,34 +23,30 @@ memory = load_memory()
 
 HF_MODEL = "OpenAssistant/release-10-13b"
 
-def query_hf_api(prompt):
-    url = f"https://router.huggingface.co/hf-inference/models/{HF_MODEL}"
-    
+def query_model(prompt):
+    url = "https://openrouter.ai/api/v1/chat/completions"
+
     headers = {
-        "Authorization": f"Bearer {HF_API_KEY}",
+        "Authorization": f"Bearer {os.getenv('OPENROUTER_API_KEY')}",
         "Content-Type": "application/json"
     }
 
-    payload = {
-        "inputs": prompt,
-        "parameters": {
-            "max_new_tokens": 200,
-            "temperature": 0.7
-        }
+    data = {
+        "model": "mistralai/mistral-7b-instruct",
+        "messages": [
+            {"role": "system", "content": "You are Lilyth, an intelligent and conversational AI."},
+            {"role": "user", "content": prompt}
+        ]
     }
 
-    response = requests.post(url, headers=headers, json=payload)
+    response = requests.post(url, headers=headers, json=data)
 
-    # 🔎 Si réponse vide ou erreur HTTP
     if response.status_code != 200:
-        return f"Erreur HF {response.status_code}: {response.text}"
+        return f"Erreur OpenRouter {response.status_code}: {response.text}"
 
     result = response.json()
+    return result["choices"][0]["message"]["content"]
 
-    if isinstance(result, list):
-        return result[0].get("generated_text", "Pas de réponse.")
-    else:
-        return str(result)
 
 async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     try:
