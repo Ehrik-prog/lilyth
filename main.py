@@ -61,8 +61,8 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text(answer)
 
     except Exception as e:
-        print("Erreur:", e)
-        await update.message.reply_text("⚠️ Une erreur est survenue.")
+    print("ERREUR COMPLETE:", str(e))
+    await update.message.reply_text("Erreur technique : " + str(e))
 
 if __name__ == "__main__":
     app = Application.builder().token(TELEGRAM_TOKEN).build()
