@@ -1,43 +1,44 @@
 import os
-import asyncio
+import json
 from telegram import Update
-from telegram.ext import Application, CommandHandler, ContextTypes
-import openai
+from telegram.ext import Application, MessageHandler, filters, ContextTypes
 
-# Assure-toi que tes variables Railway sont bien partagées et accessibles
-TELEGRAM_TOKEN = os.getenv("TELEGRAM_TOKEN")
-OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
+TOKEN = os.getenv("TELEGRAM_TOKEN")
 
-openai.api_key = OPENAI_API_KEY
+# -------- MEMOIRE --------
+MEMORY_FILE = "memory.json"
 
-async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    await update.message.reply_text("🤖 Lilyth est connectée et prête !")
+def load_memory():
+    if not os.path.exists(MEMORY_FILE):
+        return {}
+    with open(MEMORY_FILE, "r") as f:
+        return json.load(f)
 
-async def ask_ai(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    user_text = " ".join(context.args)
-    if not user_text:
-        await update.message.reply_text("Envoie-moi une question après la commande.")
-        return
+def save_memory(memory):
+    with open(MEMORY_FILE, "w") as f:
+        json.dump(memory, f, indent=4)
 
-    # Appel à OpenAI
-    response = openai.ChatCompletion.create(
-        model="gpt-3.5-turbo",
-        messages=[{"role": "user", "content": user_text}],
-        temperature=0.7
-    )
-    answer = response.choices[0].message.content
-    await update.message.reply_text(answer)
+memory = load_memory()
 
-async def main():
-    app = Application.builder().token(TELEGRAM_TOKEN).build()
+# -------- HANDLER --------
+async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    try:
+        user_id = str(update.message.from_user.id)
+        text = update.message.text
 
-    app.add_handler(CommandHandler("start", start))
-    app.add_handler(CommandHandler("ask", ask_ai))
+        # Sauvegarde mémoire simple
+        memory[user_id] = text
+        save_memory(memory)
 
-    print("🤖 Lilyth démarre sur Telegram...")
-    await app.run_polling(close_loop=False)
+        await update.message.reply_text(f"Lilyth V1 active 🖤\nTu as dit : {text}")
 
+    except Exception as e:
+        print("Erreur :", e)
+        await update.message.reply_text("⚠️ Une erreur est survenue.")
+
+# -------- MAIN --------
 if __name__ == "__main__":
-    import nest_asyncio
-    nest_asyncio.apply()  # pour colab / environnements déjà asynchrones
-    asyncio.run(main())
+    app = Application.builder().token(TOKEN).build()
+    app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
+    print("🤖 Lilyth V1 connectée")
+    app.run_polling()
