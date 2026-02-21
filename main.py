@@ -51,7 +51,6 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
             content = msg["content"]
             full_prompt += f"{role}: {content}\n​"
 ​
-"
 
         answer = query_hf_api(full_prompt)
 
