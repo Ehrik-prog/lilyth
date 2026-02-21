@@ -21,17 +21,18 @@ def save_memory(memory):
 
 memory = load_memory()
 
-HF_MODEL = "meta-llama/Llama-3.1-8B-Instruct"
+HF_MODEL = "google/gemma-2b-it"
 
 def query_hf_api(prompt):
-    url = "https://api-inference.huggingface.co/models/" + HF_MODEL
+    url = f"https://api-inference.huggingface.co/models/{HF_MODEL}"
     headers = {
-        "Authorization": "Bearer " + HF_API_KEY
+        "Authorization": f"Bearer {HF_API_KEY}"
     }
     payload = {
         "inputs": prompt,
         "options": {"wait_for_model": True}
     }
+
     response = requests.post(url, headers=headers, json=payload)
     result = response.json()
 
@@ -60,13 +61,12 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
         await update.message.reply_text(answer)
 
-        except Exception as e:
-        print("ERREUR COMPLETE:", str(e))
-        await update.message.reply_text("Erreur technique : " + str(e))
-
+    except Exception as e:
+        print("ERREUR:", e)
+        await update.message.reply_text("Erreur : " + str(e))
 
 if __name__ == "__main__":
     app = Application.builder().token(TELEGRAM_TOKEN).build()
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
-    print("🤖 Lilyth HF gratuite connectée")
+    print("Lilyth V1 active")
     app.run_polling()
