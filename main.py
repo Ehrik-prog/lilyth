@@ -25,19 +25,30 @@ HF_MODEL = "google/gemma-2b-it"
 
 def query_hf_api(prompt):
     url = f"https://router.huggingface.co/hf-inference/models/{HF_MODEL}"
+    
     headers = {
-        "Authorization": f"Bearer {HF_API_KEY}"
+        "Authorization": f"Bearer {HF_API_KEY}",
+        "Content-Type": "application/json"
     }
+
     payload = {
         "inputs": prompt,
-        "options": {"wait_for_model": True}
+        "parameters": {
+            "max_new_tokens": 200,
+            "temperature": 0.7
+        }
     }
 
     response = requests.post(url, headers=headers, json=payload)
+
+    # 🔎 Si réponse vide ou erreur HTTP
+    if response.status_code != 200:
+        return f"Erreur HF {response.status_code}: {response.text}"
+
     result = response.json()
 
     if isinstance(result, list):
-        return result[0]["generated_text"]
+        return result[0].get("generated_text", "Pas de réponse.")
     else:
         return str(result)
 
